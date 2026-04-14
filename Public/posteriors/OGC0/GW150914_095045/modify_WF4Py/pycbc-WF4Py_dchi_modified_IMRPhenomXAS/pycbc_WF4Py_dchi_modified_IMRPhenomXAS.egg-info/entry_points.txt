@@ -1,0 +1,2 @@
+[pycbc.waveform.fd]
+dchi_modified_IMRPhenomXAS = dchi_modified_IMRPhenomXAS:get_dchi_modified_IMRPhenomXAS

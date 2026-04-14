@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "algorithm": "c",
+        "random": "c",
+        "gsl_linalg.h": "c",
+        "cmath": "c",
+        "complex": "c"
+    }
+}

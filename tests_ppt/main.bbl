@@ -1,0 +1,50 @@
+\begin{thebibliography}{10}
+
+\bibitem{test_GR_BBH_O1}
+B. P. Abbott, R.~Abbott, T. D. Abbott, et~al.
+\newblock Binary black hole mergers in the first advanced ligo observing run.
+\newblock {\em Physical Review X}, 6(4), October 2016.
+
+\bibitem{test_GR_GW150914}
+B. P. Abbott, R.~Abbott, T. D. Abbott, et~al.
+\newblock Tests of general relativity with gw150914.
+\newblock {\em Physical Review Letters}, 116(22), May 2016.
+
+\bibitem{test_GR_GW170817}
+B. P. Abbott, R.~Abbott, T. D. Abbott, et~al.
+\newblock Tests of general relativity with gw170817.
+\newblock {\em Physical Review Letters}, 123(1), July 2019.
+
+\bibitem{false_parametrization}
+Alvin J.~K. Chua and Michele Vallisneri.
+\newblock On parametric tests of relativity with false degrees of freedom, 2020.
+
+\bibitem{test_GR_GWTC3}
+The LIGO~Scientific Collaboration, the Virgo~Collaboration, the KAGRA~Collaboration, et~al.
+\newblock Tests of general relativity with gwtc-3, 2021.
+
+\bibitem{wf_modelling_for_LISA}
+LISA Consortium Waveform~Working Group et~al.
+\newblock Waveform modelling for the laser interferometer space antenna, 2023.
+
+\bibitem{gw_tests_relation}
+Nathan~K. Johnson-McDaniel, Abhirup Ghosh, Sudarshan Ghonge, Muhammed Saleem, N. V. Krishnendu, and James~A. Clark.
+\newblock Investigating the relation between gravitational wave tests of general relativity.
+\newblock {\em Physical Review D}, 105(4), February 2022.
+
+\bibitem{pPMR}
+Elisa Maggio, Hector~O. Silva, Alessandra Buonanno, and Abhirup Ghosh.
+\newblock Tests of general relativity in the nonlinear regime: A parametrized plunge-merger-ringdown gravitational waveform model.
+\newblock {\em Physical Review D}, 108(2), July 2023.
+
+\bibitem{reexpress_pn_3}
+Chandra~Kant Mishra, K.~G. Arun, Bala~R. Iyer, and B.~S. Sathyaprakash.
+\newblock Parametrized tests of post-newtonian theory using advanced ligo and einstein telescope.
+\newblock {\em Physical Review D}, 82(6), September 2010.
+
+\bibitem{ppE}
+Nicolás Yunes and Frans Pretorius.
+\newblock Fundamental theoretical bias in gravitational wave astrophysics and the parametrized post-einsteinian framework.
+\newblock {\em Physical Review D}, 80(12), December 2009.
+
+\end{thebibliography}

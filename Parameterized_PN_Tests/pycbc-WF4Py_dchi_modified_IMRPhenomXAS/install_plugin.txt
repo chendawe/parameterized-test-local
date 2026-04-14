@@ -1,0 +1,3 @@
+conda activate pycbc
+cd /mnt/d/Documents/workspace/课题/workspace/Local/Parameterized_PN_Tests/pycbc-WF4Py_dchi_modified_IMRPhenomXAS
+pip install .

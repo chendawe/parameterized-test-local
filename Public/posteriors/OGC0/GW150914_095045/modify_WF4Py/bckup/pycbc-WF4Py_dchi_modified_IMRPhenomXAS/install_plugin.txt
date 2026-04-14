@@ -1,0 +1,3 @@
+conda activate preload
+cd /workspace/chendawww/modify_WF4Py/pycbc-WF4Py_dchi_modified_IMRPhenomXAS
+pip install .
