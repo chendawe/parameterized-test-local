@@ -1,0 +1,787 @@
+Import Utils
+In[1]:= Get["D:\\Documents\\workspace\\课题\\workspace\\Local\\Public\\mathematica\\PN_inverse\\InversePNUtils.nb"];
+In[5]:= (*NotebookEvaluate["D:\\Documents\\workspace\\课题\\PN_inverse\\InversePNUtils.nb"]*)
+In[2]:= NotebookEvaluate["D:\\Documents\\workspace\\课题\\workspace\\Local\\Public\\mathematica\\PN_inverse\\InversePNUtils.nb"];
+During evaluation of In[6]:= 输入Mc范围：{8,15}
+During evaluation of In[6]:= 输入q范围：{1,20}
+During evaluation of In[6]:= m1范围：{9.18959,91.4002}
+During evaluation of In[6]:= m2范围：{2.43734,17.2305}
+During evaluation of In[7]:= 输入Mc范围：{6,13}
+During evaluation of In[7]:= 输入q范围：{1,7}
+During evaluation of In[7]:= m1范围：{6.89219,42.9142}
+During evaluation of In[7]:= m2范围：{2.82950,14.9331}
+During evaluation of In[121]:= 全局极小值结果：{0.,{m1->3.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[121]:= 全局极大值结果：{0.,{m1->3.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[126]:= 全局极小值结果：{2.81559*10^-11,{m1->46.8969,m2->60.4341,spin1z->0.435746,spin2z->-0.638885}}
+During evaluation of In[126]:= 全局极大值结果：{8.65708,{m1->100.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[131]:= 全局极小值结果：{8.47209*10^-10,{m1->60.1419,m2->76.87,spin1z->0.320417,spin2z->-0.443897}}
+During evaluation of In[131]:= 全局极大值结果：{1.94773,{m1->100.,m2->3.,spin1z->0.99,spin2z->0.99}}
+Read from CSV
+In[3]:= (* ==================配置==================*)
+baseDir="D:\\Documents\\workspace\\课题\\workspace\\Local\\Parameterized_PN_Tests\\csv";
+eventID="GW150914";
+
+(*键名直接用短名，里面加上下划线*)
+inspiralParams={"dphi_0","dphi_2","dphi_3","dphi_4","dphi_5l","dphi_6","dphi_6l","dphi_7"};
+intermediateParams={"dbeta_2","dbeta_3"};
+mergerParams={"dalpha_2","dalpha_3","dalpha_4"};
+
+allParams=Join[inspiralParams,intermediateParams,mergerParams];
+
+(* ==================读取函数==================*)
+readDeviationFile[shortName_]:=Module[{path,raw},(*短名拼接上 _IMRP_posterior 还原成完整文件名*)path=FileNameJoin[{baseDir,eventID,shortName<>"_IMRP_posterior.csv"}];
+raw=Import[path];
+(*提取前五列*){raw[[2;;,1]],(*m1*)raw[[2;;,2]],(*m2*)raw[[2;;,3]],(*spin1z*)raw[[2;;,4]],(*spin2z*)raw[[2;;,5]]  (*偏差参数值*)}]
+
+(*批量读取，键名就是传入的 shortName*)
+readAllDeviations[]:=AssociationMap[readDeviationFile,allParams]
+
+(* ==================执行==================*)
+samples=readAllDeviations[];
+
+(* ==================用法示例==================*)
+(*直接用短名取值*)
+dphi0vals=samples["dphi_0"][[5]];
+dalpha3vals=samples["dalpha_3"][[5]];
+Calculate GR pars and further Transform $\delta$ into parameterized pars
+In[14]:= getGRValues[paramName_,m1s_,m2s_,chi1Ls_,chi2Ls_]:=Module[{etas},etas=etaFromMasses[m1s,m2s];
+Switch[paramName,
+(* =====Alpha (并合段)=====*)
+"dalpha_2",IMRPhenomDAlpha[2,m1s,m2s,chi1Ls,chi2Ls],
+"dalpha_3",IMRPhenomDAlpha[3,m1s,m2s,chi1Ls,chi2Ls],
+"dalpha_4",IMRPhenomDAlpha[4,m1s,m2s,chi1Ls,chi2Ls],
+(* =====Beta (过渡段)=====*)
+"dbeta_2",IMRPhenomDBeta[2,m1s,m2s,chi1Ls,chi2Ls],
+"dbeta_3",IMRPhenomDBeta[3,m1s,m2s,chi1Ls,chi2Ls],
+(* =====Phi (旋近段)=====因为设置了 Listable，直接把整个 m1s,m2s 列表传进去即可，内部会自动对每个元素计算并返回列表*)
+"dphi_0",IMRPhenomDPhiNS[0,m1s,m2s,0,0],
+"dphi_2",IMRPhenomDPhiNS[2,m1s,m2s,0,0],
+"dphi_3",IMRPhenomDPhiNS[3,m1s,m2s,0,0],
+"dphi_4",IMRPhenomDPhiNS[4,m1s,m2s,0,0],
+"dphi_5l",IMRPhenomDPhiLNS[5,m1s,m2s,0,0],
+"dphi_6",IMRPhenomDPhiNS[6,m1s,m2s,0,0],
+"dphi_6l",IMRPhenomDPhiLNS[6,m1s,m2s,0,0],
+"dphi_7",IMRPhenomDPhiNS[7,m1s,m2s,0,0],
+_,ConstantArray[0,Length[m1s]]
+]
+];
+
+(* ==========对所有参数追加第6列(GR值)和第7列(参数化值)==========*)
+Do[Module[{grVals,paramVals},
+(*第6列：非自旋 GR 系数值*)grVals=getGRValues[p,samples[p][[1]],samples[p][[2]],samples[p][[3]],samples[p][[4]]];
+(*第7列：参数化值=GR\[Times](1+d)*)paramVals=grVals*(1+samples[p][[5]]);
+(*拼接到原来的5列后面*)samples[p]=Join[samples[p],{grVals,paramVals}];
+],{p,allParams}];
+
+m1-m2 Plot, 22
+INSPIRAL
+phi_ 2
+In[16]:=  (* ==========================================*)(*1. 数据提取与概率密度 (不变)*)(* ==========================================*)
+p="dphi_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];m2Data=samples[p][[2]];
+devData=samples[p][[5]];
+grData=samples[p][[6]];   (*GR 系数值*)
+paramData=samples[p][[7]];  (*GR*(1+d) 参数化值*)
+
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{23,42},{1,4}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+During evaluation of In[16]:= 输入Mc范围：{23,42}
+During evaluation of In[16]:= 输入q范围：{1,4}
+During evaluation of In[16]:= m1范围：{26.4201,100.894}
+During evaluation of In[16]:= m2范围：{13.8129,48.2453}
+During evaluation of In[16]:= 对称数据：原始 0 + 镜像 0
+During evaluation of In[16]:= SmoothKernelDistribution::invldd: The input data SmoothKernelDistribution[{}] should be a vector or a matrix of real numbers or a valid TemporalData object.
+During evaluation of In[16]:= NIntegrate::izero: Integral and error estimates are 0 on all integration subregions. Try increasing the value of the MinRecursion option. If value of integral may be 0, specify a finite value for the AccuracyGoal option.
+During evaluation of In[16]:= 对称先验空间积分 = 0.（应接近1）
+During evaluation of In[16]:= NIntegrate::izero: Integral and error estimates are 0 on all integration subregions. Try increasing the value of the MinRecursion option. If value of integral may be 0, specify a finite value for the AccuracyGoal option.
+During evaluation of In[16]:= 归一化验证 = 0.
+During evaluation of In[16]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[16]:= 对称边界框：{13.8129, 100.894} * {13.8129, 100.894}
+During evaluation of In[16]:= 等高线值：{0.005}，共 0 条
+During evaluation of In[16]:= Part::partw: Part 1 of {} does not exist.
+During evaluation of In[16]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[16]:= [合并模式] 将 0 个片段强制合并为一个多边形进行积分...
+During evaluation of In[16]:= 警告：合并后点数不足，无法构成多边形，跳过
+During evaluation of In[16]:= Part::partd: Part specification [[2]] is longer than depth of object.
+probability=prob
+probability=0.5
+
+(* ==========================================*)(*2. 解析参数名+计算目标值*)(* ==========================================*)
+m1s=Range[20,60,1];m2s=Range[20,60,1];
+
+pInterval=IntervalFromProbability[probability/2];
+
+tapeIntervals["mass1"]=Quantile[m1Data,pInterval];
+tapeIntervals["mass2"]=Quantile[m2Data,pInterval];
+
+(*⭐ 解析参数名：自动拼出真实的物理函数*)
+paramCore=StringDrop[p,1];  (*"dphi_2"->"phi_2"*)
+{typeName,orderStr}=StringSplit[paramCore,"_"];
+orderVal=If[StringEndsQ[orderStr,"l"],orderStr,ToExpression[orderStr]];
+realFuncName=Symbol["IMRPhenomD"<>Capitalize[typeName]<>"NS"];
+
+(*⭐⭐⭐ 关键修复：强制 N[] 确保目标值一定是数字 ⭐⭐⭐*)
+grTargets=N[Quantile[N[grData],N[pInterval]]];     (*两个数字：{下界,上界}*)
+paramTargets=N[Quantile[N[paramData],N[pInterval]]]; (*两个数字：{下界,上界}*)
+
+(*打印验证*)
+Print[p," grTargets = ",grTargets];
+Print[p," paramTargets = ",paramTargets];
+
+
+(* ==========================================*)
+(*3. 反解（GR 和参数化用同一个公式，目标值不同）*)
+(* ==========================================*)
+(*物理含义：GR 线：IMRPhenomDPhiNS[2,m1,m2,0,0]==GR系数的分位数 参数化线：IMRPhenomDPhiNS[2,m1,m2,0,0]==参数化值的分位数 两者用的是同一个解析函数，区别只在目标值*)
+theFormula=Function[{h,m2,c1,c2},realFuncName[orderVal,h,m2,c1,c2]];
+
+chi1Fixed=0;chi2Fixed=0;
+fixedArgs={chi1Fixed,chi2Fixed};
+h0guess=N[Median[m1Data]];
+h0s={h0guess,h0guess}; (*两个目标值需要两个初始猜测*)
+
+Quiet[grSurface=HypersurfacePancake[theFormula,grTargets,{m2s},{1},fixedArgs,h0s,1];
+paramSurface=HypersurfacePancake[theFormula,paramTargets,{m2s},{1},fixedArgs,h0s,1];];
+
+
+(* ==========================================*)
+(*4. 裁剪（GR 两条线+参数化两条线）*)
+(* ==========================================*)
+(*通用提取函数*)
+extractLine[surface_,idx_]:=If[MatchQ[surface,{__List}]&&Length[surface]>=idx&&Length[surface[[idx]]]>1,Select[surface[[idx]][[2;;]],Function[pt,m2s[[1]]<=pt[[2]]<=m2s[[-1]]]],{}];
+
+(*GR：下界线+上界线*)
+grLineDown=extractLine[grSurface,1];
+grLineUp=extractLine[grSurface,2];
+
+(*参数化：下界线+上界线*)
+lineDown=extractLine[paramSurface,1];
+lineUp=extractLine[paramSurface,2];
+
+Print[p," GR 线有效点数：下=",Length[grLineDown]," 上=",Length[grLineUp]];
+Print[p," 参数化线有效点数：下=",Length[lineDown]," 上=",Length[lineUp]];
+
+
+(* ==========================================*)(*6. 绘图（有啥画啥，哪怕只有一条边）*)(* ==========================================*)(*---动态组装线条---*)linesToPlot={};
+plotStyles={};
+
+(*红色：概率密度等值线（始终画）*)
+AppendTo[linesToPlot,contourPoints[p][[1]]];
+AppendTo[plotStyles,Red];
+
+(*蓝色虚线：GR 反解线（有就画）*)
+If[Length[grLineDown]>0,AppendTo[linesToPlot,grLineDown];
+AppendTo[plotStyles,Directive[Blue,Dashed]]];
+If[Length[grLineUp]>0,AppendTo[linesToPlot,grLineUp];
+AppendTo[plotStyles,Directive[Blue,Dashed]]];
+
+(*紫色：参数化反解线（有就画，哪怕只有一条边）*)
+If[Length[lineDown]>0,AppendTo[linesToPlot,lineDown];
+AppendTo[plotStyles,Purple]];
+If[Length[lineUp]>0,AppendTo[linesToPlot,lineUp];
+AppendTo[plotStyles,Purple]];
+
+
+(*---Epilog 组装（彻底修复语法错误）---*)
+epilogParts={};
+
+(*1. 参数化区域填充（上下界都在时才填充，样式和图形基元平级）*)
+If[Length[lineUp]>0&&Length[lineDown]>0,AppendTo[epilogParts,Directive[Purple,Opacity[0.2]]];(*只有样式*)AppendTo[epilogParts,Polygon[Flatten[{lineUp,Reverse[lineDown]},1]]]; (*图形基元*)];
+
+(*2. 画参数化边界线*)
+If[Length[lineDown]>0,AppendTo[epilogParts,Directive[Purple,Thickness[0.004]]];
+AppendTo[epilogParts,Line[lineDown]];];
+If[Length[lineUp]>0,AppendTo[epilogParts,Directive[Purple,Thickness[0.004]]];
+AppendTo[epilogParts,Line[lineUp]];];
+
+(*3. 图例和对角线（固定部分）*)
+AppendTo[epilogParts,Directive[Black,Opacity[1]]];
+AppendTo[epilogParts,Inset[legends[p],Scaled[{0.25,0.82}],{0,0}]];
+AppendTo[epilogParts,Directive[Black,Dashed,Opacity[1]]];
+AppendTo[epilogParts,Line[{{0,0},{100,100}}]];
+
+
+(*---出图判断---*)
+(*红色等值线+至少一条反解线 就画*)
+If[Length[linesToPlot]>=2,ListLinePlot[linesToPlot,PlotStyle->plotStyles,Axes->False,Frame->True,FrameLabel->{Row[{Subscript[m,1],"/",Subscript[m,"\[Sun]"]}],Row[{Subscript[m,2],"/",Subscript[m,"\[Sun]"]}]},FrameStyle->Directive[Black,Thickness[0.004]],BaseStyle->{FontSize->15},AspectRatio->1,PlotRange->{{m1s[[1]],m1s[[-1]]},{m2s[[1]],m2s[[-1]]}},Epilog->epilogParts,PlotLabel->With[{value=probability},TraditionalForm[HoldForm[Subscript[p,"c"]==value]]],ImageSize->Medium],(*一条反解线都没有时*)Print["提示：",p," 没有任何反解线，跳过绘图。"]]
+
+phi_ 2
+In[17]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+During evaluation of In[17]:= 输入Mc范围：{10,80}
+During evaluation of In[17]:= 输入q范围：{1,10}
+During evaluation of In[17]:= m1范围：{11.4870,324.615}
+During evaluation of In[17]:= m2范围：{4.05769,91.8959}
+During evaluation of In[17]:= 对称数据：原始 17687 + 镜像 17687
+During evaluation of In[17]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[17]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.000000300345417` and 3.5676188221842714`*^-6 for the integral and error estimates.
+During evaluation of In[17]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[17]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[17]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999999999999823` and 3.5676177505909136`*^-6 for the integral and error estimates.
+During evaluation of In[17]:= 归一化验证 = 1.
+During evaluation of In[17]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[17]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[17]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[17]:= 第一条前3点：{{34.7643,35.7652},{34.7637,35.7655},{34.749,35.7783}}
+During evaluation of In[17]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[17]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[17]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[17]:= =====  =====
+During evaluation of In[17]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[17]:=   区域内总积分值：0.182194
+During evaluation of In[17]:=   可信水平百分比：18.2194%
+During evaluation of In[17]:= ==========================
+
+During evaluation of In[17]:= dphi_2 预处理完成，红线包含概率 prob = 0.182194
+In[28]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[28]= 
+In[29]:= probability=prob;
+probability=0.9999;
+
+PlotInversion[p,probability,1,200,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDPhiNS,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[31]= 
+phi_ 4
+In[32]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_4"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+During evaluation of In[32]:= 输入Mc范围：{10,80}
+During evaluation of In[32]:= 输入q范围：{1,10}
+During evaluation of In[32]:= m1范围：{11.4870,324.615}
+During evaluation of In[32]:= m2范围：{4.05769,91.8959}
+During evaluation of In[32]:= 对称数据：原始 16389 + 镜像 16389
+During evaluation of In[32]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[32]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000002416175102` and 4.339533676993899`*^-6 for the integral and error estimates.
+During evaluation of In[32]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[32]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[32]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999999999999984` and 4.339532628682603`*^-6 for the integral and error estimates.
+During evaluation of In[32]:= 归一化验证 = 1.
+During evaluation of In[32]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[32]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[32]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[32]:= 第一条前3点：{{32.7821,33.7827},{32.785,33.7868},{32.5747,34.0042}}
+During evaluation of In[32]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[32]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[32]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[32]:= =====  =====
+During evaluation of In[32]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[32]:=   区域内总积分值：0.0899273
+During evaluation of In[32]:=   可信水平百分比：8.99273%
+During evaluation of In[32]:= ==========================
+
+During evaluation of In[32]:= dphi_4 预处理完成，红线包含概率 prob = 0.0899273
+In[47]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[47]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[47]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[47]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[47]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[47]= 
+In[44]:= probability=prob;
+probability=0.999;
+
+PlotInversion[p,probability,1,200,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDPhiNS,spinPercentile1->0.9,spinPercentile2->0.1,contourIndices->{2}]
+Out[46]= 
+phi_ 5l
+In[48]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_5l"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+During evaluation of In[48]:= 输入Mc范围：{10,80}
+During evaluation of In[48]:= 输入q范围：{1,10}
+During evaluation of In[48]:= m1范围：{11.4870,324.615}
+During evaluation of In[48]:= m2范围：{4.05769,91.8959}
+During evaluation of In[48]:= 对称数据：原始 16958 + 镜像 16958
+During evaluation of In[48]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[48]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000008954251443` and 4.6694296249372195`*^-6 for the integral and error estimates.
+During evaluation of In[48]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[48]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[48]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000000000000067` and 4.669425443929546`*^-6 for the integral and error estimates.
+During evaluation of In[48]:= 归一化验证 = 1.
+During evaluation of In[48]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[48]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[48]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[48]:= 第一条前3点：{{32.6378,33.6367},{32.6418,33.6436},{32.5932,33.7174}}
+During evaluation of In[48]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[48]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[48]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[48]:= =====  =====
+During evaluation of In[48]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[48]:=   区域内总积分值：0.32517
+During evaluation of In[48]:=   可信水平百分比：32.517%
+During evaluation of In[48]:= ==========================
+
+During evaluation of In[48]:= dphi_5l 预处理完成，红线包含概率 prob = 0.32517
+In[59]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[59]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[59]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[59]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[59]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[59]= 
+In[66]:= probability=prob;
+probability=0.1;
+
+PlotInversion[p,probability,1,200,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDPhiLNS,spinPercentile1->0.9,spinPercentile2->0.1,contourIndices->{2}]
+Out[68]= 
+phi_ 6
+In[69]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_6"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+During evaluation of In[69]:= 输入Mc范围：{10,80}
+During evaluation of In[69]:= 输入q范围：{1,10}
+During evaluation of In[69]:= m1范围：{11.4870,324.615}
+During evaluation of In[69]:= m2范围：{4.05769,91.8959}
+During evaluation of In[69]:= 对称数据：原始 18998 + 镜像 18998
+During evaluation of In[69]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[69]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000001976769604` and 2.425400723913994`*^-6 for the integral and error estimates.
+During evaluation of In[69]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[69]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[69]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.000000000000019` and 2.4254002448805095`*^-6 for the integral and error estimates.
+During evaluation of In[69]:= 归一化验证 = 1.
+During evaluation of In[69]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[69]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[69]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[69]:= 第一条前3点：{{32.1556,33.1551},{32.1547,33.1564},{32.0504,33.256}}
+During evaluation of In[69]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[69]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[69]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[69]:= =====  =====
+During evaluation of In[69]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[69]:=   区域内总积分值：0.433885
+During evaluation of In[69]:=   可信水平百分比：43.3885%
+During evaluation of In[69]:= ==========================
+
+During evaluation of In[69]:= dphi_6 预处理完成，红线包含概率 prob = 0.433885
+In[80]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[80]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[80]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[80]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[80]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[80]= 
+In[105]:= probability=prob;
+probability=0.99;
+
+PlotInversion[p,probability,1,200,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDPhiNS,spinPercentile1->0.1,spinPercentile2->0.9,contourIndices->{2}]
+
+Out[107]= 
+phi_ 7
+In[108]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_7"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+During evaluation of In[108]:= 输入Mc范围：{10,80}
+During evaluation of In[108]:= 输入q范围：{1,10}
+During evaluation of In[108]:= m1范围：{11.4870,324.615}
+During evaluation of In[108]:= m2范围：{4.05769,91.8959}
+During evaluation of In[108]:= 对称数据：原始 14982 + 镜像 14982
+During evaluation of In[108]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[108]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000004327830005` and 4.301831691834177`*^-6 for the integral and error estimates.
+During evaluation of In[108]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[108]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[108]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999999999999717` and 4.301829829675532`*^-6 for the integral and error estimates.
+During evaluation of In[108]:= 归一化验证 = 1.
+During evaluation of In[108]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[108]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[108]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[108]:= 第一条前3点：{{35.0155,36.0172},{35.0155,36.0172},{34.7189,36.2682}}
+During evaluation of In[108]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[108]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[108]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[108]:= =====  =====
+During evaluation of In[108]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[108]:=   区域内总积分值：0.492959
+During evaluation of In[108]:=   可信水平百分比：49.2959%
+During evaluation of In[108]:= ==========================
+
+During evaluation of In[108]:= dphi_7 预处理完成，红线包含概率 prob = 0.492959
+In[119]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[119]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[119]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[119]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[119]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[119]= 
+In[129]:=  probability=prob;
+probability=0.9999;
+
+PlotInversion[p,probability,1,200,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDPhiNS,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[131]= 
+Intermediate
+beta_ 2
+In[416]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dbeta_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+During evaluation of In[416]:= 输入Mc范围：{10,80}
+During evaluation of In[416]:= 输入q范围：{1,10}
+During evaluation of In[416]:= m1范围：{11.4870,324.615}
+During evaluation of In[416]:= m2范围：{4.05769,91.8959}
+During evaluation of In[416]:= 对称数据：原始 21241 + 镜像 21241
+During evaluation of In[416]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[416]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999967441477285` and 3.87446905908343`*^-6 for the integral and error estimates.
+During evaluation of In[416]:= 对称先验空间积分 = 0.999997（应接近1）
+During evaluation of In[416]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[416]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000000000000167` and 3.874481673608183`*^-6 for the integral and error estimates.
+During evaluation of In[416]:= 归一化验证 = 1.
+During evaluation of In[416]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[416]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[416]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[416]:= 第一条前3点：{{32.4338,33.4355},{32.3101,33.5115},{32.1242,33.6393}}
+During evaluation of In[416]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[416]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[416]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[416]:= =====  =====
+During evaluation of In[416]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[416]:=   区域内总积分值：0.560276
+During evaluation of In[416]:=   可信水平百分比：56.0276%
+During evaluation of In[416]:= ==========================
+
+During evaluation of In[416]:= dbeta_2 预处理完成，红线包含概率 prob = 0.560276
+In[143]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[143]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[143]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[143]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[143]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[143]= 
+In[427]:= probability=prob;
+probability=0.21;
+
+PlotInversion[p,probability,5,100,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDBeta,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[429]= 
+beta_ 3
+In[335]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dbeta_3"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.017};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+During evaluation of In[335]:= 输入Mc范围：{10,80}
+During evaluation of In[335]:= 输入q范围：{1,10}
+During evaluation of In[335]:= m1范围：{11.4870,324.615}
+During evaluation of In[335]:= m2范围：{4.05769,91.8959}
+During evaluation of In[335]:= 对称数据：原始 18356 + 镜像 18356
+During evaluation of In[335]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[335]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000002655333116` and 3.1816982156292938`*^-6 for the integral and error estimates.
+During evaluation of In[335]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[335]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[335]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999999999999999` and 3.18169737054015`*^-6 for the integral and error estimates.
+During evaluation of In[335]:= 归一化验证 = 1.
+During evaluation of In[335]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[335]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[335]:= 等高线值：{0.017}，共 2 条
+During evaluation of In[335]:= 第一条前3点：{{35.251,36.2497},{35.1867,36.3286},{35.3554,36.3542}}
+During evaluation of In[335]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[335]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[335]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[335]:= =====  =====
+During evaluation of In[335]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[335]:=   区域内总积分值：0.00395618
+During evaluation of In[335]:=   可信水平百分比：0.395618%
+During evaluation of In[335]:= ==========================
+
+During evaluation of In[335]:= dbeta_3 预处理完成，红线包含概率 prob = 0.00395618
+In[212]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[212]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[212]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[212]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[212]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[212]= 
+In[413]:= probability=prob;
+probability=0.5;
+
+PlotInversion[p,probability,10,100,1,cm->True,cd->False,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDBeta,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[415]= 
+Merger - RingDown
+alpha_ 2
+In[662]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dalpha_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.009612};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+During evaluation of In[662]:= 输入Mc范围：{10,80}
+During evaluation of In[662]:= 输入q范围：{1,10}
+During evaluation of In[662]:= m1范围：{11.4870,324.615}
+During evaluation of In[662]:= m2范围：{4.05769,91.8959}
+During evaluation of In[662]:= 对称数据：原始 14828 + 镜像 14828
+During evaluation of In[662]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[662]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000003242723599` and 7.121932527464343`*^-6 for the integral and error estimates.
+During evaluation of In[662]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[662]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[662]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000000000000115` and 7.121930218110289`*^-6 for the integral and error estimates.
+During evaluation of In[662]:= 归一化验证 = 1.
+During evaluation of In[662]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[662]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[662]:= 等高线值：{0.009612}，共 2 条
+During evaluation of In[662]:= 第一条前3点：{{36.9409,35.9392},{37.115,35.7932},{37.1274,35.7828}}
+During evaluation of In[662]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[662]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[662]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[662]:= =====  =====
+During evaluation of In[662]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[662]:=   区域内总积分值：0.182613
+During evaluation of In[662]:=   可信水平百分比：18.2613%
+During evaluation of In[662]:= ==========================
+
+During evaluation of In[662]:= dalpha_2 预处理完成，红线包含概率 prob = 0.182613
+In[441]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[441]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[441]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[441]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[441]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[441]= 
+In[673]:=  probability=prob;
+(*probability=0.1;*)
+
+PlotInversion[p,probability,20,50,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDAlpha,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{1}]
+Out[674]= 
+alpha_ 3
+In[767]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dalpha_3"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.01007};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+During evaluation of In[767]:= 输入Mc范围：{10,80}
+During evaluation of In[767]:= 输入q范围：{1,10}
+During evaluation of In[767]:= m1范围：{11.4870,324.615}
+During evaluation of In[767]:= m2范围：{4.05769,91.8959}
+During evaluation of In[767]:= 对称数据：原始 17962 + 镜像 17962
+During evaluation of In[767]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[767]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000010400058361` and 4.6945771793765886`*^-6 for the integral and error estimates.
+During evaluation of In[767]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[767]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[767]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000000000000235` and 4.6945722971168496`*^-6 for the integral and error estimates.
+During evaluation of In[767]:= 归一化验证 = 1.
+During evaluation of In[767]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[767]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[767]:= 等高线值：{0.01007}，共 2 条
+During evaluation of In[767]:= 第一条前3点：{{34.7113,35.713},{34.6629,35.7729},{34.5805,35.8641}}
+During evaluation of In[767]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[767]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[767]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[767]:= =====  =====
+During evaluation of In[767]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[767]:=   区域内总积分值：0.185238
+During evaluation of In[767]:=   可信水平百分比：18.5238%
+During evaluation of In[767]:= ==========================
+
+During evaluation of In[767]:= dalpha_3 预处理完成，红线包含概率 prob = 0.185238
+In[686]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[686]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[686]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[686]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[686]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[686]= 
+In[778]:= probability=prob;
+PlotInversion[p,probability,20,50,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDAlpha,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[779]= 
+alpha_ 4
+In[354]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dalpha_4"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{10,80},{1,10}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.0142915};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+During evaluation of In[354]:= 输入Mc范围：{10,80}
+During evaluation of In[354]:= 输入q范围：{1,10}
+During evaluation of In[354]:= m1范围：{11.4870,324.615}
+During evaluation of In[354]:= m2范围：{4.05769,91.8959}
+During evaluation of In[354]:= 对称数据：原始 18402 + 镜像 18402
+During evaluation of In[354]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[354]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000009368716383` and 4.544065059816595`*^-6 for the integral and error estimates.
+During evaluation of In[354]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[354]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[354]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000000000000078` and 4.544060802584907`*^-6 for the integral and error estimates.
+During evaluation of In[354]:= 归一化验证 = 1.
+During evaluation of In[354]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[354]:= 对称边界框：{4.05769, 324.615} * {4.05769, 324.615}
+During evaluation of In[354]:= 等高线值：{0.0142915}，共 2 条
+During evaluation of In[354]:= 第一条前3点：{{35.765,34.7633},{35.7754,34.7494},{35.9278,34.5832}}
+During evaluation of In[354]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[354]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[354]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[354]:= =====  =====
+During evaluation of In[354]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[354]:=   区域内总积分值：0.0982813
+During evaluation of In[354]:=   可信水平百分比：9.82813%
+During evaluation of In[354]:= ==========================
+
+During evaluation of In[354]:= dalpha_4 预处理完成，红线包含概率 prob = 0.0982813
+In[27]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+Out[27]= 
+In[365]:= probability=prob;
+(*probability=0.01;*)
+
+PlotInversion[p,probability,20,50,1,cm->True,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomDAlpha,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[366]= 

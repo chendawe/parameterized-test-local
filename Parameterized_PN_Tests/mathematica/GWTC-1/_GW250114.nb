@@ -1,0 +1,567 @@
+Import Utils
+In[1]:= Get["D:\\Documents\\workspace\\课题\\workspace\\Local\\Public\\mathematica\\PN_inverse\\InversePNUtils.nb"];
+In[5]:= (*NotebookEvaluate["D:\\Documents\\workspace\\课题\\PN_inverse\\InversePNUtils.nb"]*)
+In[2]:= NotebookEvaluate["D:\\Documents\\workspace\\课题\\workspace\\Local\\Public\\mathematica\\PN_inverse\\InversePNUtils.nb"];
+During evaluation of In[6]:= 输入Mc范围：{8,15}
+During evaluation of In[6]:= 输入q范围：{1,20}
+During evaluation of In[6]:= m1范围：{9.18959,91.4002}
+During evaluation of In[6]:= m2范围：{2.43734,17.2305}
+During evaluation of In[7]:= 输入Mc范围：{6,13}
+During evaluation of In[7]:= 输入q范围：{1,7}
+During evaluation of In[7]:= m1范围：{6.89219,42.9142}
+During evaluation of In[7]:= m2范围：{2.82950,14.9331}
+During evaluation of In[121]:= 全局极小值结果：{0.,{m1->3.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[121]:= 全局极大值结果：{0.,{m1->3.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[126]:= 全局极小值结果：{2.81559*10^-11,{m1->46.8969,m2->60.4341,spin1z->0.435746,spin2z->-0.638885}}
+During evaluation of In[126]:= 全局极大值结果：{8.65708,{m1->100.,m2->3.,spin1z->0.99,spin2z->0.99}}
+During evaluation of In[131]:= 全局极小值结果：{8.47209*10^-10,{m1->60.1419,m2->76.87,spin1z->0.320417,spin2z->-0.443897}}
+During evaluation of In[131]:= 全局极大值结果：{1.94773,{m1->100.,m2->3.,spin1z->0.99,spin2z->0.99}}
+Read from CSV
+In[474]:= (* ==================配置==================*)
+baseDir="D:\\Documents\\workspace\\课题\\workspace\\Local\\Parameterized_PN_Tests\\csv";
+eventID="GW170814";
+
+(*键名直接用短名，里面加上下划线*)
+inspiralParams={"dphi_2","dphi_3","dphi_4","dphi_5l","dphi_6","dphi_7"};
+intermediateParams={};
+mergerParams={};
+
+allParams=Join[inspiralParams,intermediateParams,mergerParams];
+
+(* ==================读取函数==================*)
+readDeviationFile[shortName_]:=Module[{path,raw},(*短名拼接上 _IMRP_posterior 还原成完整文件名*)path=FileNameJoin[{baseDir,eventID,shortName<>"_IMRP_posterior.csv"}];
+raw=Import[path];
+(*提取前五列*){raw[[2;;,1]],(*m1*)raw[[2;;,2]],(*m2*)raw[[2;;,3]],(*spin1z*)raw[[2;;,4]],(*spin2z*)raw[[2;;,5]]  (*偏差参数值*)}]
+
+(*批量读取，键名就是传入的 shortName*)
+readAllDeviations[]:=AssociationMap[readDeviationFile,allParams]
+
+(* ==================执行==================*)
+samples=readAllDeviations[];
+
+(* ==================用法示例==================*)
+(*直接用短名取值*)
+dalpha3vals=samples["dalpha_3"][[5]];
+During evaluation of In[474]:= Part::partw: Part 5 of Missing[KeyAbsent,dalpha_3] does not exist.
+In[23]:= IMRPhenomXASPhi[3,20,30,0.2,0.3]
+Out[23]= -134.289
+Calculate GR pars and further Transform $\delta$ into parameterized pars
+In[484]:= (*批量计算非自旋 GR 系数值*)getGRValues[paramName_,m1s_,m2s_,chi1L_,chi2L_]:=Module[{etas},etas=etaFromMasses[m1s,m2s];
+Switch[paramName,
+(*(* =====Alpha (并合段)=====*)"dalpha_3",IMRPhenomDAlphaNS[3,m1s,m2s,0,0],"dalpha_4",IMRPhenomDAlphaNS[4,m1s,m2s,0,0],"dalpha_2",IMRPhenomDAlphaNS[2,m1s,m2s,0,0],
+(* =====Beta (过渡段)=====*)"dbeta_2",IMRPhenomDBetaNS[2,m1s,m2s,0,0],"dbeta_3",IMRPhenomDBetaNS[3,m1s,m2s,0,0],*)
+(* =====Phi (旋近段)=====因为设置了 Listable，直接把整个 m1s,m2s 列表传进去即可，内部会自动对每个元素计算并返回列表*)
+"dphi_0",IMRPhenomXASPhi[0,m1s,m2s,chi1L,chi2L],
+"dphi_2",IMRPhenomXASPhi[2,m1s,m2s,chi1L,chi2L],
+"dphi_3",IMRPhenomXASPhi[3,m1s,m2s,chi1L,chi2L],
+"dphi_4",IMRPhenomXASPhi[4,m1s,m2s,chi1L,chi2L],
+"dphi_5l",IMRPhenomXASPhiL[5,m1s,m2s,chi1L,chi2L],
+"dphi_6",IMRPhenomXASPhi[6,m1s,m2s,chi1L,chi2L],
+"dphi_6l",IMRPhenomXASPhiL[6,m1s,m2s,chi1L,chi2L],
+"dphi_7",IMRPhenomXASPhi[7,m1s,m2s,chi1L,chi2L],
+_,ConstantArray[0,Length[m1s]]]];
+
+
+(* ==========对所有参数追加第6列(GR值)和第7列(参数化值)==========*)
+Do[Module[{grVals,paramVals},
+(*第6列：非自旋 GR 系数值*)grVals=getGRValues[p,samples[p][[1]],samples[p][[2]],samples[p][[3]],samples[p][[4]]];
+(*第7列：参数化值=GR\[Times](1+d)*)paramVals=grVals*(1+samples[p][[5]]);
+(*拼接到原来的5列后面*)samples[p]=Join[samples[p],{grVals,paramVals}];
+],{p,allParams}];
+
+
+m1-m2 Plot, 22
+INSPIRAL
+phi_2
+In[40]:= (* ==========================================*)
+(*1. 数据提取与概率密度 (不变)*)
+(* ==========================================*)
+p="dphi_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];m2Data=samples[p][[2]];
+devData=samples[p][[5]];
+grData=samples[p][[6]];   (*GR 系数值*)
+paramData=samples[p][[7]];  (*GR*(1+d) 参数化值*)
+
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{16,33},{1,7}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+During evaluation of In[40]:= 输入Mc范围：{16,33}
+During evaluation of In[40]:= 输入q范围：{1,7}
+During evaluation of In[40]:= m1范围：{18.3792,108.936}
+During evaluation of In[40]:= m2范围：{7.54535,37.9070}
+During evaluation of In[40]:= 对称数据：原始 14630 + 镜像 14630
+During evaluation of In[40]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[40]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 1.0000001232294253` and 3.118961832333939`*^-6 for the integral and error estimates.
+During evaluation of In[40]:= 对称先验空间积分 = 1.（应接近1）
+During evaluation of In[40]:= NIntegrate::slwcon: Numerical integration converging too slowly; suspect one of the following: singularity, value of the integration is 0, highly oscillatory integrand, or WorkingPrecision too small.
+During evaluation of In[40]:= NIntegrate::eincr: The global error of the strategy GlobalAdaptive has increased more than 2000 times. The global error is expected to decrease monotonically after a number of integrand evaluations. Suspect one of the following: the working precision is insufficient for the specified precision goal; the integrand is highly oscillatory or it is not a (piecewise) smooth function; or the true value of the integral is 0. Increasing the value of the GlobalAdaptive option MaxErrorIncreases might lead to a convergent numerical integration. NIntegrate obtained 0.9999999999999856` and 3.118961447841143`*^-6 for the integral and error estimates.
+During evaluation of In[40]:= 归一化验证 = 1.
+During evaluation of In[40]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[40]:= 对称边界框：{7.54535, 108.936} * {7.54535, 108.936}
+During evaluation of In[40]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[40]:= 第一条前3点：{{32.5465,32.2297},{32.5539,32.2227},{32.6378,32.141}}
+During evaluation of In[40]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[40]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[40]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[40]:= =====  =====
+During evaluation of In[40]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[40]:=   区域内总积分值：0.543985
+During evaluation of In[40]:=   可信水平百分比：54.3985%
+During evaluation of In[40]:= ==========================
+
+In[86]:= ListLinePlot[contourPoints[p]]
+Out[86]= 
+In[140]:= probability=prob
+probability=0.1
+
+(* ==========================================*)(*2. 解析参数名+计算目标值*)(* ==========================================*)
+m1s=Range[20,40,1];m2s=Range[20,40,1];
+
+pInterval=IntervalFromProbability[probability/2];
+
+tapeIntervals["mass1"]=Quantile[m1Data,pInterval];
+tapeIntervals["mass2"]=Quantile[m2Data,pInterval];
+
+(*⭐ 解析参数名：自动拼出真实的物理函数*)
+paramCore=StringDrop[p,1];  (*"dphi_2"->"phi_2"*)
+{typeName,orderStr}=StringSplit[paramCore,"_"];
+orderVal=If[StringEndsQ[orderStr,"l"],orderStr,ToExpression[orderStr]];
+(*realFuncName=Symbol["IMRPhenomD"<>Capitalize[typeName]<>"NS"];*)
+realFuncName=Symbol["IMRPhenomXASPhi"];
+
+(*⭐⭐⭐ 关键修复：强制 N[] 确保目标值一定是数字 ⭐⭐⭐*)
+grTargets=N[Quantile[N[grData],N[pInterval]]];     (*两个数字：{下界,上界}*)
+paramTargets=N[Quantile[N[paramData],N[pInterval]]]; (*两个数字：{下界,上界}*)
+
+(*打印验证*)
+Print[p," grTargets = ",grTargets];
+Print[p," paramTargets = ",paramTargets];
+
+
+(* ==========================================*)
+(*3. 反解（GR 和参数化用同一个公式，目标值不同）*)
+(* ==========================================*)
+(*物理含义：GR 线：IMRPhenomDPhiNS[2,m1,m2,0,0]==GR系数的分位数 参数化线：IMRPhenomDPhiNS[2,m1,m2,0,0]==参数化值的分位数 两者用的是同一个解析函数，区别只在目标值*)
+theFormula=Function[{h,m2,c1,c2},realFuncName[orderVal,h,m2,c1,c2]];
+
+chi1Fixed=0;chi2Fixed=0;
+fixedArgs={chi1Fixed,chi2Fixed};
+h0guess=N[Median[m1Data]];
+h0s={h0guess,h0guess}; (*两个目标值需要两个初始猜测*)
+
+Quiet[grSurface=HypersurfacePancake[theFormula,grTargets,{m2s},{1},fixedArgs,h0s,1];
+paramSurface=HypersurfacePancake[theFormula,paramTargets,{m2s},{1},fixedArgs,h0s,1];];
+
+
+(* ==========================================*)
+(*4. 裁剪（GR 两条线+参数化两条线）*)
+(* ==========================================*)
+(*通用提取函数*)
+extractLine[surface_,idx_]:=If[MatchQ[surface,{__List}]&&Length[surface]>=idx&&Length[surface[[idx]]]>1,Select[surface[[idx]][[2;;]],Function[pt,m2s[[1]]<=pt[[2]]<=m2s[[-1]]]],{}];
+
+(*GR：下界线+上界线*)
+grLineDown=extractLine[grSurface,1];
+grLineUp=extractLine[grSurface,2];
+
+(*参数化：下界线+上界线*)
+lineDown=extractLine[paramSurface,1];
+lineUp=extractLine[paramSurface,2];
+
+Print[p," GR 线有效点数：下=",Length[grLineDown]," 上=",Length[grLineUp]];
+Print[p," 参数化线有效点数：下=",Length[lineDown]," 上=",Length[lineUp]];
+
+
+(* ==========================================*)(*6. 绘图（有啥画啥，哪怕只有一条边）*)(* ==========================================*)(*---动态组装线条---*)linesToPlot={};
+plotStyles={};
+
+(*红色：概率密度等值线（始终画）*)
+AppendTo[linesToPlot,contourPoints[p][[1]]];
+AppendTo[plotStyles,Red];
+
+(*蓝色虚线：GR 反解线（有就画）*)
+If[Length[grLineDown]>0,AppendTo[linesToPlot,grLineDown];
+AppendTo[plotStyles,Directive[Blue,Dashed]]];
+If[Length[grLineUp]>0,AppendTo[linesToPlot,grLineUp];
+AppendTo[plotStyles,Directive[Blue,Dashed]]];
+
+(*紫色：参数化反解线（有就画，哪怕只有一条边）*)
+If[Length[lineDown]>0,AppendTo[linesToPlot,lineDown];
+AppendTo[plotStyles,Purple]];
+If[Length[lineUp]>0,AppendTo[linesToPlot,lineUp];
+AppendTo[plotStyles,Purple]];
+
+
+(*---Epilog 组装（彻底修复语法错误）---*)
+epilogParts={};
+
+(*1. 参数化区域填充（上下界都在时才填充，样式和图形基元平级）*)
+If[Length[lineUp]>0&&Length[lineDown]>0,AppendTo[epilogParts,Directive[Purple,Opacity[0.2]]];(*只有样式*)AppendTo[epilogParts,Polygon[Flatten[{lineUp,Reverse[lineDown]},1]]]; (*图形基元*)];
+
+(*2. 画参数化边界线*)
+If[Length[lineDown]>0,AppendTo[epilogParts,Directive[Purple,Thickness[0.004]]];
+AppendTo[epilogParts,Line[lineDown]];];
+If[Length[lineUp]>0,AppendTo[epilogParts,Directive[Purple,Thickness[0.004]]];
+AppendTo[epilogParts,Line[lineUp]];];
+
+(*3. 图例和对角线（固定部分）*)
+AppendTo[epilogParts,Directive[Black,Opacity[1]]];
+AppendTo[epilogParts,Inset[legends[p],Scaled[{0.25,0.82}],{0,0}]];
+AppendTo[epilogParts,Directive[Black,Dashed,Opacity[1]]];
+AppendTo[epilogParts,Line[{{0,0},{100,100}}]];
+
+
+(*---出图判断---*)
+(*红色等值线+至少一条反解线 就画*)
+If[Length[linesToPlot]>=2,ListLinePlot[linesToPlot,PlotStyle->plotStyles,Axes->False,Frame->True,FrameLabel->{Row[{Subscript[m,1],"/",Subscript[m,"\[Sun]"]}],Row[{Subscript[m,2],"/",Subscript[m,"\[Sun]"]}]},FrameStyle->Directive[Black,Thickness[0.004]],BaseStyle->{FontSize->15},AspectRatio->1,PlotRange->{{m1s[[1]],m1s[[-1]]},{m2s[[1]],m2s[[-1]]}},Epilog->epilogParts,PlotLabel->With[{value=probability},TraditionalForm[HoldForm[Subscript[p,"c"]==value]]],ImageSize->Medium],(*一条反解线都没有时*)Print["提示：",p," 没有任何反解线，跳过绘图。"]]
+
+
+Out[140]= 0.543985
+Out[141]= 0.1
+During evaluation of In[140]:= dphi_2 grTargets = {13.7873,13.7939}
+During evaluation of In[140]:= dphi_2 paramTargets = {11.2371,11.5885}
+During evaluation of In[140]:= dphi_2 GR 线有效点数：下=12 上=13
+During evaluation of In[140]:= dphi_2 参数化线有效点数：下=0 上=0
+Out[183]= 
+phi_2
+In[501]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_2"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.00095};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[501]:= 输入Mc范围：{25,35}
+During evaluation of In[501]:= 输入q范围：{1,2}
+During evaluation of In[501]:= m1范围：{28.7175,57.5313}
+During evaluation of In[501]:= m2范围：{20.5469,40.2044}
+During evaluation of In[501]:= 对称数据：原始 14630 + 镜像 14630
+During evaluation of In[501]:= 对称先验空间积分 = 0.949053（应接近1）
+During evaluation of In[501]:= 归一化验证 = 1.
+During evaluation of In[501]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[501]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[501]:= 等高线值：{0.00095}，共 2 条
+During evaluation of In[501]:= 第一条前3点：{{24.6269,28.7991},{24.6051,28.8248},{24.5802,28.854}}
+During evaluation of In[501]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[501]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[501]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[501]:= =====  =====
+During evaluation of In[501]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[501]:=   区域内总积分值：0.9381
+During evaluation of In[501]:=   可信水平百分比：93.81%
+During evaluation of In[501]:= ==========================
+
+During evaluation of In[501]:= dphi_2 预处理完成，红线包含概率 prob = 0.9381
+ListLinePlot[contourPoints[p]]
+In[28]:= 
+compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[28]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[28]= 
+In[512]:= probability=prob;
+(*probability=0.98;
+*)
+PlotInversion[p,probability,10,60,1,cm->False,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomXASPhi,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{2}]
+Out[513]= 
+In[515]:= samples[p][[6]]
+Out[515]= {13.7266,13.765,13.8044,13.7008,13.788,13.811,13.7096,13.6045,13.7853,13.8149,13.7675,13.8177,13.6921,13.6853,13.8178,13.79,13.7746,13.7581,13.8058,13.793,13.8104,13.6889,13.7944,13.8173,13.8134,13.8178,13.7711,13.8173, \[CenterEllipsis]14574\[CenterEllipsis] ,13.7948,13.7899,13.7067,13.8103,13.4196,13.8178,13.6511,13.817,13.7692,13.811,13.6222,13.4381,13.8128,13.7067,13.7838,13.6164,13.8153,13.7624,13.7519,13.7972,13.7642,13.8155,13.7424,13.7316,13.8159,13.8165,13.8151,13.6549}
+Size in memory: 117.2 kB 	Show more  |  Show all  |  Iconize  |  Store full expression in notebook
+
+
+phi_3
+In[336]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_3"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.01285};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[336]:= 输入Mc范围：{25,35}
+During evaluation of In[336]:= 输入q范围：{1,2}
+During evaluation of In[336]:= m1范围：{28.7175,57.5313}
+During evaluation of In[336]:= m2范围：{20.5469,40.2044}
+During evaluation of In[336]:= 对称数据：原始 18679 + 镜像 18679
+During evaluation of In[336]:= 对称先验空间积分 = 0.976822（应接近1）
+During evaluation of In[336]:= 归一化验证 = 1.
+During evaluation of In[336]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[336]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[336]:= 等高线值：{0.01285}，共 2 条
+During evaluation of In[336]:= 第一条前3点：{{29.7978,29.9133},{29.7977,29.9133},{29.7972,29.9139}}
+During evaluation of In[336]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[336]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[336]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[336]:= =====  =====
+During evaluation of In[336]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[336]:=   区域内总积分值：0.144111
+During evaluation of In[336]:=   可信水平百分比：14.4111%
+During evaluation of In[336]:= ==========================
+
+During evaluation of In[336]:= dphi_3 预处理完成，红线包含概率 prob = 0.144111
+In[505]:= ListLinePlot[contourPoints[p]]
+Out[505]= 
+In[506]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,0.9,-0.9]
+Out[506]= 
+In[368]:= probability=prob;
+(*probability=0.1;*)
+
+PlotInversion[p,probability,20,40,0.1,cm->False,cd->True,cu->False,plotgr->False,projX->False,projY->False,funcName->IMRPhenomXASPhi,spinPercentile1->0.1,spinPercentile2->0.9,contourIndices->{2}]
+Out[369]= 
+phi_4==========================
+In[1330]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_4"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.007};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[1330]:= 输入Mc范围：{25,35}
+During evaluation of In[1330]:= 输入q范围：{1,2}
+During evaluation of In[1330]:= m1范围：{28.7175,57.5313}
+During evaluation of In[1330]:= m2范围：{20.5469,40.2044}
+During evaluation of In[1330]:= 对称数据：原始 21964 + 镜像 21964
+During evaluation of In[1330]:= 对称先验空间积分 = 0.983334（应接近1）
+During evaluation of In[1330]:= 归一化验证 = 1.
+During evaluation of In[1330]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[1330]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[1330]:= 等高线值：{0.007}，共 2 条
+During evaluation of In[1330]:= 第一条前3点：{{28.8895,29.0051},{28.8628,29.0386},{28.855,29.0483}}
+During evaluation of In[1330]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[1330]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[1330]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[1330]:= =====  =====
+During evaluation of In[1330]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[1330]:=   区域内总积分值：0.492992
+During evaluation of In[1330]:=   可信水平百分比：49.2992%
+During evaluation of In[1330]:= ==========================
+
+During evaluation of In[1330]:= dphi_4 预处理完成，红线包含概率 prob = 0.492992
+In[414]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+Out[414]= 
+In[1370]:= probability=prob;
+probability=0.4;
+
+PlotInversion[p,probability,1,100,cm->True,cd->True,cu->True,plotgr->False,projX->True,projY->False,funcName->IMRPhenomXASPhi,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{1,2}]
+Out[1372]= 
+phi_5l
+In[1505]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_5l"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.014082};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[1505]:= 输入Mc范围：{25,35}
+During evaluation of In[1505]:= 输入q范围：{1,2}
+During evaluation of In[1505]:= m1范围：{28.7175,57.5313}
+During evaluation of In[1505]:= m2范围：{20.5469,40.2044}
+During evaluation of In[1505]:= 对称数据：原始 20374 + 镜像 20374
+During evaluation of In[1505]:= 对称先验空间积分 = 0.986435（应接近1）
+During evaluation of In[1505]:= 归一化验证 = 1.
+During evaluation of In[1505]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[1505]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[1505]:= 等高线值：{0.014082}，共 2 条
+During evaluation of In[1505]:= 第一条前3点：{{31.3133,30.6749},{31.3294,30.6768},{31.3444,30.6777}}
+During evaluation of In[1505]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[1505]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[1505]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[1505]:= =====  =====
+During evaluation of In[1505]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[1505]:=   区域内总积分值：0.00353002
+During evaluation of In[1505]:=   可信水平百分比：0.353002%
+During evaluation of In[1505]:= ==========================
+
+During evaluation of In[1505]:= dphi_5l 预处理完成，红线包含概率 prob = 0.00353002
+In[879]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+During evaluation of In[879]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[879]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[879]:= StringMatchQ::strse: String or list of strings expected at position 1 in StringMatchQ[orderVal,RegularExpression[^[0-9]l$]].
+During evaluation of In[879]:= General::stop: Further output of StringMatchQ::strse will be suppressed during this calculation.
+Out[879]= 
+In[1516]:= probability=prob;
+(*probability=0.001;*)
+
+PlotInversion[p,probability,29.5,32,0.1,cm->False,cd->True,cu->True,plotgr->True,projX->False,projY->False,funcName->IMRPhenomXASPhiL,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{1}]
+Out[1517]= 
+phi_6
+In[1095]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_6"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.0101};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[1095]:= 输入Mc范围：{25,35}
+During evaluation of In[1095]:= 输入q范围：{1,2}
+During evaluation of In[1095]:= m1范围：{28.7175,57.5313}
+During evaluation of In[1095]:= m2范围：{20.5469,40.2044}
+During evaluation of In[1095]:= 对称数据：原始 23399 + 镜像 23399
+During evaluation of In[1095]:= 对称先验空间积分 = 0.991483（应接近1）
+During evaluation of In[1095]:= 归一化验证 = 1.
+During evaluation of In[1095]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[1095]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[1095]:= 等高线值：{0.0101}，共 2 条
+During evaluation of In[1095]:= 第一条前3点：{{29.7405,29.8557},{29.7403,29.8559},{29.7345,29.8617}}
+During evaluation of In[1095]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[1095]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[1095]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[1095]:= =====  =====
+During evaluation of In[1095]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[1095]:=   区域内总积分值：0.353141
+During evaluation of In[1095]:=   可信水平百分比：35.3141%
+During evaluation of In[1095]:= ==========================
+
+During evaluation of In[1095]:= dphi_6 预处理完成，红线包含概率 prob = 0.353141
+In[846]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+Out[846]= 
+In[1106]:= probability=prob;
+(*probability=0.35;*)
+
+PlotInversion[p,probability,10,50,cm->False,cd->True,cu->True,plotgr->False,projX->False,projY->False,funcName->IMRPhenomXASPhi,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{1,2}]
+
+Out[1107]= 
+phi_7
+In[574]:= (* ==========================================*)(*阶段一：预处理（算概率、提取红线）*)(* ==========================================*)
+p="dphi_7"; (*换参数改这里*)
+
+m1Data=samples[p][[1]];
+m2Data=samples[p][[2]];
+
+(*算 PDF*)
+m1m2[p]=Transpose[{m1Data,m2Data}];
+{m1PriorRange[p],m2PriorRange[p]}=ChirpQRangeToMassRange[{25, 35}, {1, 2}];
+m1m2PDF[p]=GetNormalizedPDF[m1m2[p],m1PriorRange[p],m2PriorRange[p]];
+
+(*提取 0.005 密度对应的红线*)
+contourPD[p]={0.005};
+{contourPlotObj[p],contourPoints[p]}=GetContourPlotAndPoints[m1m2PDF[p],m1PriorRange[p],m2PriorRange[p],contourPD[p]];
+contourPoints[p][[1]]=SmoothContour[contourPoints[p][[1]]];
+
+(*算出红线内部包含的真实后验概率 prob*)
+prob=CalculateCredibleLevelsFromContours[m1m2PDF[p],contourPoints[p],"",True][[1]][[2]];
+
+Print[p," 预处理完成，红线包含概率 prob = ",prob];
+
+
+During evaluation of In[574]:= 输入Mc范围：{25,35}
+During evaluation of In[574]:= 输入q范围：{1,2}
+During evaluation of In[574]:= m1范围：{28.7175,57.5313}
+During evaluation of In[574]:= m2范围：{20.5469,40.2044}
+During evaluation of In[574]:= 对称数据：原始 22418 + 镜像 22418
+During evaluation of In[574]:= 对称先验空间积分 = 0.992638（应接近1）
+During evaluation of In[574]:= 归一化验证 = 1.
+During evaluation of In[574]:= Set::wrsym: Symbol Automatic is Protected.
+During evaluation of In[574]:= 对称边界框：{20.5469, 57.5313} * {20.5469, 57.5313}
+During evaluation of In[574]:= 等高线值：{0.005}，共 2 条
+During evaluation of In[574]:= 第一条前3点：{{33.3021,33.4177},{33.3021,33.4177},{33.2683,33.4502}}
+During evaluation of In[574]:= Set::setps: contourPoints[p] in the part assignment is not a symbol.
+During evaluation of In[574]:= [合并模式] 将 2 个片段强制合并为一个多边形进行积分...
+During evaluation of In[574]:= NIntegrate::regm: Method LocalAdaptive is not applicable for a region domain. Continuing with method Automatic.
+During evaluation of In[574]:= =====  =====
+During evaluation of In[574]:=   包含片段数：2 (合并模式: True)
+During evaluation of In[574]:=   区域内总积分值：0.680017
+During evaluation of In[574]:=   可信水平百分比：68.0017%
+During evaluation of In[574]:= ==========================
+
+During evaluation of In[574]:= dphi_7 预处理完成，红线包含概率 prob = 0.680017
+In[585]:= compPlots[p]=PlotComparisonBetween[samples[p][[7]],(*第7列：参数化系数样本*)samples[p][[6]],(*第6列：GR理论预测样本*)Range[10,100,1],(*m1 范围*)orderVal,(*阶数 order*)Median[chi1Data],(*自旋1*)Median[chi2Data]           (*自旋2*)]
+Out[585]= 
+In[832]:= probability=prob;
+probability=0.2066;
+(*0.32*)
+PlotInversion[p,probability,20,45,cm->True,cd->False,cu->False,plotgr->False,projX->False,projY->False,funcName->IMRPhenomXASPhi,spinPercentile1->0.5,spinPercentile2->0.5,contourIndices->{1,2}]
+
+(*{0.05,0.50}*)
+(*{0.05,0.95}*)
+(*{0.50,0.05}*)
+(*{0.50,0.50}*)
+(*{0.50,0.95}*)
+Out[834]= 
+In[1824]:= samples["dphi_7"][[7]]
+Out[1824]= {5966.92,5001.32,5598.74,3434.17,3479.96,2001.46,4342.87,5345.76,8837.6,5144.79,5183.02,2606.73,3546.3,4393.57,1212.63,4681.56,5460.3,6689.53,5420.39,2567.06,4423.62,4416.96,5629.64,7098.95,5906.97,5926.87,3103.51,4191.4,4649.72,4821.98,433.272,2058.1,6954.55,1230.63,3684.98,3261.51,3837.92,4145.01,3950.39,2701.05,5539.97,5958.88,7575.79,4040.01,2209.25,2235.22,2307.5,4069.95,6465.49,1518.76,6148.9,7506.49, \[CenterEllipsis]14878\[CenterEllipsis] ,6716.59,4731.71,7657.73,3099.71,2932.51,8738.21,4664.07,4814.95,3573.02,4709.42,8189.19,6965.1,6169.85,2446.63,5103.85,4830.7,1178.87,5350.7,4220.96,6159.41,6010.86,4646.98,4659.66,3976.48,2410.32,6044.71,6445.35,5531.88,2110.84,4357.78,2273.54,4498.25,4199.3,3167.59,2764.38,3021.45,2648.25,4123.44,1994.68,4358.46,4289.35,1082.62,5627.45,6955.09,3721.51,5540.4,5132.3,3736.28,6421.15,5941.11,5524.3,4436.49}
+Full expression not available (original memory size: 120.1 kB)
+
+
+utils

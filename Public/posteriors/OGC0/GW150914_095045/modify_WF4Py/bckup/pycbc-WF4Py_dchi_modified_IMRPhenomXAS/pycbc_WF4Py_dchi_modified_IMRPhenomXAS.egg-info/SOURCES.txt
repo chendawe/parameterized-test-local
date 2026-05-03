@@ -1,7 +1,0 @@
-setup.py
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/PKG-INFO
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/SOURCES.txt
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/dependency_links.txt
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/entry_points.txt
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/requires.txt
-pycbc_WF4Py_dchi_modified_IMRPhenomXAS.egg-info/top_level.txt

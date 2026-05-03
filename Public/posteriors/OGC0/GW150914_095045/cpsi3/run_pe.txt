@@ -1,2 +1,0 @@
-conda activate preload
-mpirun /workspace/chendawww/pe/GW150914_095045/cpsi3/run_pe.sh &> /workspace/chendawww/pe/GW150914_095045/cpsi3/output.txt
