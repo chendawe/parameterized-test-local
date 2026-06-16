@@ -14,7 +14,7 @@
             - The `waveform.py` code (for generating the corresponding time domain waveform): [pycbc/waveform.py](pycbc/waveform.py)
             - USAGES: Directly replace the corresponding file in WF4Py and PyCBC.
     - (_DEPRECATED_) [LALSuite codes](./preload_c_library): codes for implementing the non-gr PN coefficients for `LALSuite` by `preload`.
-    - For the codes for running on the server for parameter estimation, please see the GitHub repository: .
+    - For the codes for running on the server for parameter estimation, please see [server_backup.tar.gz](server_backup.tar.gz).
 
 
 - __Data Analysis Pipeline__
